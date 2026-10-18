@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle } from 'lucide-react';
-import { registerUser, loginUser } from '../services/authApi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle, Server, Settings2 } from 'lucide-react';
+import { registerUser, loginUser, getApiBase, setApiBase } from '../services/authApi';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode = 'login', initialPlan = null }) {
   const [mode, setMode] = useState('login'); // 'login' or 'register'
@@ -11,15 +12,26 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showServerConfig, setShowServerConfig] = useState(false);
+  const [customUrl, setCustomUrl] = useState('');
 
   useEffect(() => {
     const determinedMode = (initialMode === 'register' || initialPlan === 'register') ? 'register' : 'login';
     setMode(determinedMode);
     setError('');
     setSuccess('');
+    setCustomUrl(getApiBase());
   }, [initialMode, initialPlan, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleSaveCustomUrl = () => {
+    setApiBase(customUrl);
+    setShowServerConfig(false);
+    setError('');
+    setSuccess('Server URL updated!');
+    setTimeout(() => setSuccess(''), 2000);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +39,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
     setSuccess('');
 
     if (mode === 'login') {
-      const loginIdentifier = email.trim(); // can be username or email
+      const loginIdentifier = email.trim();
       const pass = password.trim();
 
       if (!loginIdentifier || !pass) {
@@ -83,7 +95,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       }
 
       if (uName.length < 3 || uName.length > 32) {
-        setError('Username must be between 3 and 32 characters.');
+        setError('Username must be between 3 und 32 characters.');
         return;
       }
 
@@ -135,11 +147,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
       onClick={onClose}
     >
-      <div
+      <motion.div
+        initial={{ scale: 0.94, opacity: 0, y: 15 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 15 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
         className="relative w-full max-w-md rounded-2xl bg-[#0E1017] border border-white/[0.08] p-7 shadow-2xl text-left"
         onClick={(e) => e.stopPropagation()}
       >
@@ -151,11 +170,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         </button>
 
         {/* Tab Switcher: Sign In vs Register */}
-        <div className="flex rounded-lg bg-[#141722] p-1 mb-6 border border-white/[0.06]">
+        <div className="flex rounded-xl bg-[#141722] p-1 mb-6 border border-white/[0.06]">
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); setSuccess(''); }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
               mode === 'login'
                 ? 'bg-red-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -166,7 +185,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           <button
             type="button"
             onClick={() => { setMode('register'); setError(''); setSuccess(''); }}
-            className={`flex-1 py-2 text-xs font-semibold rounded-md transition-all ${
+            className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
               mode === 'register'
                 ? 'bg-red-600 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
@@ -186,17 +205,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         </p>
 
         {error && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-950/30 border border-rose-500/20 text-rose-400 text-xs mb-4">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-start gap-2.5 p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs mb-4 leading-relaxed"
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <div>{error}</div>
+          </motion.div>
         )}
 
         {success && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 text-xs mb-4">
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-2 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/20 text-emerald-400 text-xs mb-4"
+          >
             <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>{success}</span>
-          </div>
+          </motion.div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5">
@@ -205,17 +232,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               <label className="block text-[11px] font-mono text-slate-300 mb-1 uppercase tracking-wider">
                 Username
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="e.g. frost"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
-                  disabled={loading}
-                  required
-                />
-              </div>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="e.g. frost"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+                disabled={loading}
+                required
+              />
             </div>
           )}
 
@@ -228,7 +253,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder={mode === 'login' ? 'Enter username or email' : 'you@example.com'}
-              className="w-full px-3.5 py-2.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
               disabled={loading}
               required
             />
@@ -243,7 +268,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••••••"
-              className="w-full px-3.5 py-2.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[#141722] border border-white/[0.08] text-white text-xs placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
               disabled={loading}
               required
             />
@@ -259,33 +284,78 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
                 value={licenseKey}
                 onChange={(e) => setLicenseKey(e.target.value)}
                 placeholder="Paste key if already claimed on Discord"
-                className="w-full px-3.5 py-2.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs font-mono placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#141722] border border-white/[0.08] text-white text-xs font-mono placeholder:text-slate-600 focus:outline-none focus:border-red-500 transition-colors"
                 disabled={loading}
               />
             </div>
           )}
 
-          <button
+          <motion.button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-60 mt-2"
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.99 }}
+            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors disabled:opacity-60 mt-2 shadow-md shadow-red-950/40"
           >
             {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Account'}
-          </button>
+          </motion.button>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-white/[0.05] text-center text-xs text-slate-400">
-          Need a license key?{' '}
-          <a
-            href="https://discord.gg/8BH7TBYKEz"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-red-400 hover:underline font-medium"
+        <div className="mt-5 pt-4 border-t border-white/[0.05] flex items-center justify-between text-xs text-slate-400">
+          <div>
+            Need a key?{' '}
+            <a
+              href="https://discord.gg/8BH7TBYKEz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-red-400 hover:underline font-medium"
+            >
+              Boost Discord
+            </a>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowServerConfig(!showServerConfig)}
+            className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
           >
-            Boost our Discord server
-          </a>
+            <Settings2 className="w-3 h-3" />
+            <span>Endpoint</span>
+          </button>
         </div>
-      </div>
-    </div>
+
+        {/* Optional Collapsible Server URL config */}
+        <AnimatePresence>
+          {showServerConfig && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mt-3 pt-3 border-t border-white/[0.05] overflow-hidden"
+            >
+              <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
+                Backend Endpoint (e.g. Cloudflare Tunnel / SSL):
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs font-mono"
+                  placeholder="https://..."
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveCustomUrl}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
   );
 }

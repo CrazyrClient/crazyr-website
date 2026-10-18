@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Check, Sparkles, ExternalLink } from 'lucide-react';
 
 export default function Pricing() {
@@ -38,10 +39,16 @@ export default function Pricing() {
   ];
 
   return (
-    <section id="pricing" className="py-24 border-t border-white/[0.06] bg-[#08090D]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-2xl mx-auto text-center mb-16">
-          <span className="text-xs font-mono font-bold tracking-widest text-slate-400 uppercase mb-2 block">
+    <section id="pricing" className="py-24 border-t border-white/[0.06] bg-[#08090D] relative overflow-hidden">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-50px' }}
+          transition={{ duration: 0.5 }}
+          className="max-w-2xl mx-auto text-center mb-16"
+        >
+          <span className="text-xs font-mono font-bold tracking-widest text-red-500 uppercase mb-2 block">
             CRAZYR ACCESS
           </span>
           <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3">
@@ -50,25 +57,41 @@ export default function Pricing() {
           <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
             No subscriptions, no hidden payments. Support our official Discord server to claim your instant license key.
           </p>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto items-stretch">
           {boostPlans.map((plan, idx) => (
-            <div
+            <motion.div
               key={idx}
-              className={`p-8 rounded-2xl flex flex-col justify-between text-left transition-all ${
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-50px' }}
+              transition={{ duration: 0.5, delay: idx * 0.15 }}
+              whileHover={{
+                y: -6,
+                boxShadow: plan.featured
+                  ? '0 15px 35px -10px rgba(220, 38, 38, 0.3), 0 0 25px rgba(220, 38, 38, 0.2)'
+                  : '0 15px 35px -10px rgba(0, 0, 0, 0.8)',
+                transition: { duration: 0.2 },
+              }}
+              className={`p-8 rounded-3xl flex flex-col justify-between text-left transition-all ${
                 plan.featured
-                  ? 'bg-[#140E12] border-2 border-red-500/50 shadow-lg'
-                  : 'bg-[#0E1017] border border-white/[0.06]'
+                  ? 'bg-gradient-to-b from-[#180E14] to-[#0E1017] border-2 border-red-500/60 shadow-xl'
+                  : 'bg-[#0E1017] border border-white/[0.08]'
               }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                   {plan.featured && (
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-red-500/20 text-red-400 border border-red-500/30">
-                      Best Value
-                    </span>
+                    <motion.span
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      className="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 shadow-sm"
+                    >
+                      <Sparkles className="w-3 h-3 text-red-400" />
+                      <span>Best Value</span>
+                    </motion.span>
                   )}
                 </div>
 
@@ -95,26 +118,34 @@ export default function Pricing() {
                 </div>
               </div>
 
-              <a
+              <motion.a
                 href="https://discord.gg/8BH7TBYKEz"
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`w-full py-3.5 px-4 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className={`w-full py-3.5 px-4 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
                   plan.featured
-                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm'
+                    ? 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-950/50'
                     : 'bg-[#181B27] hover:bg-[#202434] text-slate-200 border border-white/[0.08]'
                 }`}
               >
                 <span>{plan.buttonText}</span>
                 <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            </div>
+              </motion.a>
+            </motion.div>
           ))}
         </div>
 
-        <div className="text-center mt-12 text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="text-center mt-12 text-xs text-slate-400 max-w-xl mx-auto leading-relaxed"
+        >
           How to claim: Boost our Discord server, then visit the <strong className="text-slate-300">#claim-license</strong> channel or open a support ticket to receive your instant key.
-        </div>
+        </motion.div>
       </div>
     </section>
   );
