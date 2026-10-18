@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
+import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle } from 'lucide-react';
+import { registerUser, loginUser } from '../services/authApi';
 
-export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode = 'login' }) {
-  const [mode, setMode] = useState(initialMode); // 'login' or 'register'
+export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode = 'login', initialPlan = null }) {
+  const [mode, setMode] = useState('login'); // 'login' or 'register'
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -12,10 +13,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   const [success, setSuccess] = useState('');
 
   useEffect(() => {
-    setMode(initialMode || 'login');
+    const determinedMode = (initialMode === 'register' || initialPlan === 'register') ? 'register' : 'login';
+    setMode(determinedMode);
     setError('');
     setSuccess('');
-  }, [initialMode, isOpen]);
+  }, [initialMode, initialPlan, isOpen]);
 
   if (!isOpen) return null;
 
@@ -25,72 +27,46 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
     setSuccess('');
 
     if (mode === 'login') {
-      const loginIdentifier = email.trim(); // could be email or username
+      const loginIdentifier = email.trim(); // can be username or email
       const pass = password.trim();
 
       if (!loginIdentifier || !pass) {
-        setError('Please enter your email/username and password.');
+        setError('Please enter your email or username and password.');
         return;
       }
 
       setLoading(true);
 
       try {
-        const response = await fetch('http://178.254.1.159:25575/api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ login: loginIdentifier, password: pass }),
-        });
-
-        const data = await response.json().catch(() => null);
-
-        if (response.ok && data && (data.status === 'SUCCESS' || data.success)) {
+        const data = await loginUser({ login: loginIdentifier, password: pass });
+        
+        if (data && data.status === 'SUCCESS') {
           const userObj = {
-            username: data.user?.username || loginIdentifier.split('@')[0],
-            email: data.user?.email || (loginIdentifier.includes('@') ? loginIdentifier : ''),
-            tier: data.user?.tier || 'Active Member',
-            token: data.token || 'session_token',
+            id: data.user?.id,
+            username: data.user?.username || loginIdentifier,
+            email: data.user?.email || '',
+            tier: data.user?.tier || 'member',
+            license_key: data.user?.license_key || null,
+            expiry_text: data.user?.expiry_text || null,
+            expires_at: data.user?.expires_at || null,
+            is_lifetime: data.user?.is_lifetime || false,
           };
+
+          if (data.token) {
+            localStorage.setItem('crazyr_token', data.token);
+          }
           localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-          setSuccess('Signed in successfully!');
+
+          setSuccess(`Welcome back, ${userObj.username}!`);
           setTimeout(() => {
             if (onAuthSuccess) onAuthSuccess(userObj);
             onClose();
-          }, 500);
+          }, 600);
         } else {
-          // If server returned error message
-          if (data?.message) {
-            setError(data.message);
-          } else {
-            // Local fallback login
-            const userObj = {
-              username: loginIdentifier.includes('@') ? loginIdentifier.split('@')[0] : loginIdentifier,
-              email: loginIdentifier.includes('@') ? loginIdentifier : `${loginIdentifier}@crazyr.vip`,
-              tier: 'Booster Member',
-              token: 'local_auth_session',
-            };
-            localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-            setSuccess('Signed in successfully!');
-            setTimeout(() => {
-              if (onAuthSuccess) onAuthSuccess(userObj);
-              onClose();
-            }, 500);
-          }
+          setError(data?.message || 'Invalid username or password.');
         }
       } catch (err) {
-        // Fallback for offline / uncreated DB server
-        const userObj = {
-          username: loginIdentifier.includes('@') ? loginIdentifier.split('@')[0] : loginIdentifier,
-          email: loginIdentifier.includes('@') ? loginIdentifier : `${loginIdentifier}@crazyr.vip`,
-          tier: 'Booster Member',
-          token: 'local_auth_session',
-        };
-        localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-        setSuccess('Signed in successfully!');
-        setTimeout(() => {
-          if (onAuthSuccess) onAuthSuccess(userObj);
-          onClose();
-        }, 500);
+        setError(err.message || 'Connection to auth database failed.');
       } finally {
         setLoading(false);
       }
@@ -106,68 +82,52 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         return;
       }
 
+      if (uName.length < 3 || uName.length > 32) {
+        setError('Username must be between 3 and 32 characters.');
+        return;
+      }
+
+      if (pass.length < 8) {
+        setError('Password must be at least 8 characters long.');
+        return;
+      }
+
       setLoading(true);
 
       try {
-        const response = await fetch('http://178.254.1.159:25575/api/v1/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: uName,
-            email: mail,
-            password: pass,
-            license_key: key || undefined,
-          }),
+        const data = await registerUser({
+          username: uName,
+          email: mail,
+          password: pass,
+          license_key: key || undefined,
         });
 
-        const data = await response.json().catch(() => null);
-
-        if (response.ok && data && (data.status === 'SUCCESS' || data.success)) {
+        if (data && data.status === 'SUCCESS') {
           const userObj = {
-            username: uName,
-            email: mail,
-            tier: key ? 'Booster Lifetime' : 'Active Member',
-            token: data.token || 'session_token',
+            id: data.user?.id,
+            username: data.user?.username || uName,
+            email: data.user?.email || mail,
+            tier: data.user?.tier || (key ? 'booster_1m' : 'member'),
+            license_key: data.user?.license_key || key || null,
+            expires_at: data.user?.expires_at || null,
+            is_lifetime: data.user?.is_lifetime || false,
           };
+
+          if (data.token) {
+            localStorage.setItem('crazyr_token', data.token);
+          }
           localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-          setSuccess('Account created successfully!');
+
+          setSuccess('Account created and saved to database successfully!');
           setTimeout(() => {
             if (onAuthSuccess) onAuthSuccess(userObj);
             onClose();
-          }, 500);
+          }, 600);
         } else {
-          if (data?.message) {
-            setError(data.message);
-          } else {
-            // Local fallback registration
-            const userObj = {
-              username: uName,
-              email: mail,
-              tier: key ? 'Booster Lifetime' : 'Booster Member',
-              token: 'local_reg_session',
-            };
-            localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-            setSuccess('Account created successfully!');
-            setTimeout(() => {
-              if (onAuthSuccess) onAuthSuccess(userObj);
-              onClose();
-            }, 500);
-          }
+          setError(data?.message || 'Could not register account.');
         }
       } catch (err) {
-        // Fallback registration
-        const userObj = {
-          username: uName,
-          email: mail,
-          tier: key ? 'Booster Lifetime' : 'Booster Member',
-          token: 'local_reg_session',
-        };
-        localStorage.setItem('crazyr_user', JSON.stringify(userObj));
-        setSuccess('Account created successfully!');
-        setTimeout(() => {
-          if (onAuthSuccess) onAuthSuccess(userObj);
-          onClose();
-        }, 500);
+        setError(err.message || 'Registration failed.');
       } finally {
         setLoading(false);
       }
@@ -180,12 +140,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md rounded-xl bg-[#0E1017] border border-white/[0.08] p-7 shadow-2xl text-left"
+        className="relative w-full max-w-md rounded-2xl bg-[#0E1017] border border-white/[0.08] p-7 shadow-2xl text-left"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-surface-200 transition-colors"
+          className="absolute top-5 right-5 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#141722] transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -221,8 +181,8 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
         </h3>
         <p className="text-xs text-slate-400 mb-5">
           {mode === 'login'
-            ? 'Sign in to access your dashboard and cloud configs:'
-            : 'Register your account to manage your Crazyr client license:'}
+            ? 'Sign in to access your Crazyr database account:'
+            : 'Register a new account directly in our SQLite database:'}
         </p>
 
         {error && (
@@ -276,7 +236,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
 
           <div>
             <label className="block text-[11px] font-mono text-slate-300 mb-1 uppercase tracking-wider">
-              Password
+              Password {mode === 'register' && <span className="text-slate-500">(min. 8 chars)</span>}
             </label>
             <input
               type="password"
@@ -310,7 +270,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             disabled={loading}
             className="w-full py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors disabled:opacity-60 mt-2"
           >
-            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 

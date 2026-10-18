@@ -45,7 +45,7 @@ export default function Hero() {
             href="#pricing"
             className="w-full sm:w-auto px-7 py-3.5 rounded-lg text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
-            <span>Buy now</span>
+            <span>Unlock with Boost</span>
             <ArrowRight className="w-4 h-4" />
           </a>
           <a

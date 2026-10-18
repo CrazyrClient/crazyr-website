@@ -6,23 +6,46 @@ import Pricing from './components/Pricing';
 import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
+import UserModal from './components/UserModal';
+import { fetchUserProfile } from './services/authApi';
 
 export default function App() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [authMode, setAuthMode] = useState('login');
+  const [userModalOpen, setUserModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('crazyr_user');
-    if (saved) {
+    // 1. Initial cached state
+    const savedUser = localStorage.getItem('crazyr_user');
+    const token = localStorage.getItem('crazyr_token');
+
+    if (savedUser) {
       try {
-        setCurrentUser(JSON.parse(saved));
+        setCurrentUser(JSON.parse(savedUser));
       } catch (e) {}
+    }
+
+    // 2. Fetch live profile from SQLite backend if token exists
+    if (token) {
+      fetchUserProfile(token)
+        .then((liveProfile) => {
+          if (liveProfile) {
+            setCurrentUser(liveProfile);
+            localStorage.setItem('crazyr_user', JSON.stringify(liveProfile));
+          } else {
+            // Token expired or invalid
+            localStorage.removeItem('crazyr_token');
+            localStorage.removeItem('crazyr_user');
+            setCurrentUser(null);
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
-  const handleOpenAuth = (plan = null) => {
-    setSelectedPlan(plan);
+  const handleOpenAuth = (mode = 'login') => {
+    setAuthMode(mode === 'register' ? 'register' : 'login');
     setAuthModalOpen(true);
   };
 
@@ -32,35 +55,46 @@ export default function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('crazyr_user');
+    localStorage.removeItem('crazyr_token');
     setCurrentUser(null);
+    setUserModalOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#08090D] text-slate-100 flex flex-col font-sans selection:bg-blue-600/30 selection:text-white">
+    <div className="min-h-screen bg-[#08090D] text-slate-100 flex flex-col font-sans selection:bg-red-600/30 selection:text-white">
       {/* Navbar */}
       <Navbar
         onOpenAuth={handleOpenAuth}
         currentUser={currentUser}
+        onOpenUserModal={() => setUserModalOpen(true)}
         onLogout={handleLogout}
       />
 
-      {/* Main Sections */}
+      {/* Main Content Sections */}
       <main className="flex-grow">
-        <Hero />
+        <Hero onOpenAuth={handleOpenAuth} />
         <Features />
-        <Pricing onOpenAuth={handleOpenAuth} />
+        <Pricing />
         <FAQ />
       </main>
 
       {/* Footer */}
       <Footer onOpenAuth={handleOpenAuth} />
 
-      {/* Auth / Key Verification Modal */}
+      {/* Auth Modal (Sign In / Register) */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
-        initialPlan={selectedPlan}
+        initialMode={authMode}
+      />
+
+      {/* User Account & License Details Modal */}
+      <UserModal
+        isOpen={userModalOpen}
+        onClose={() => setUserModalOpen(false)}
+        user={currentUser}
+        onLogout={handleLogout}
       />
     </div>
   );
