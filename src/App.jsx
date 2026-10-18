@@ -95,6 +95,14 @@ export default function App() {
         onClose={() => setUserModalOpen(false)}
         user={currentUser}
         onLogout={handleLogout}
+        onUserUpdate={(updatedUser) => {
+          setCurrentUser(updatedUser);
+          if (updatedUser) {
+            localStorage.setItem('crazyr_user', JSON.stringify(updatedUser));
+          } else {
+            localStorage.removeItem('crazyr_user');
+          }
+        }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = 'http://178.254.1.159:25575';
+const DEFAULT_API_BASE = 'https://shaped-export-elsewhere-graduated.trycloudflare.com';
 
 export function getApiBase() {
   if (typeof window !== 'undefined') {
@@ -117,4 +117,94 @@ export async function fetchUserProfile(token) {
   } catch (e) {
     return null;
   }
+}
+
+/**
+ * Redeem / activate a license key for an authenticated user.
+ */
+export async function redeemLicenseKey(key, token) {
+  if (!token) throw new Error('Nicht eingeloggt.');
+  if (!key || !key.trim()) throw new Error('Bitte gib einen Lizenzschlüssel an.');
+
+  let response;
+  try {
+    response = await fetch(`${getApiBase()}/api/v1/auth/redeem-key`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ key: key.trim() }),
+    });
+  } catch (err) {
+    handleFetchError(err);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.message || 'Fehler beim Einlösen des Lizenzschlüssels.');
+  }
+
+  return data;
+}
+
+/**
+ * Delete / unlink the user's active license key or a specific key.
+ */
+export async function deleteLicenseKey(token, key = null) {
+  if (!token) throw new Error('Nicht eingeloggt.');
+
+  const payload = {};
+  if (key && key.trim()) {
+    payload.key = key.trim();
+  }
+
+  let response;
+  try {
+    response = await fetch(`${getApiBase()}/api/v1/auth/delete-key`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    handleFetchError(err);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.message || 'Fehler beim Löschen des Lizenzschlüssels.');
+  }
+
+  return data;
+}
+
+/**
+ * Admin function to delete any license key using the admin token.
+ */
+export async function adminDeleteKey(adminToken, key) {
+  if (!key || !key.trim()) throw new Error('Bitte gib einen Key an.');
+
+  let response;
+  try {
+    response = await fetch(`${getApiBase()}/api/v1/admin/deletekey`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': adminToken || 'VELOXCITY_CB_ADMIN_SECRET_998877',
+      },
+      body: JSON.stringify({ key: key.trim() }),
+    });
+  } catch (err) {
+    handleFetchError(err);
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(data?.message || 'Fehler beim Löschen des Lizenzschlüssels.');
+  }
+
+  return data;
 }
