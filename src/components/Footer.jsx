@@ -1,5 +1,6 @@
 import React from 'react';
 import { Disc as Discord } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 export default function Footer({ onOpenAuth }) {
   return (
@@ -10,7 +11,7 @@ export default function Footer({ onOpenAuth }) {
           <div className="md:col-span-2 space-y-4">
             <div className="flex items-center gap-2.5">
               <img
-                src="/logo.png"
+                src={logoImg}
                 alt="CRAZYR"
                 className="w-7 h-7 rounded-lg object-contain"
               />
@@ -37,7 +38,7 @@ export default function Footer({ onOpenAuth }) {
               </li>
               <li>
                 <a href="#pricing" className="hover:text-red-400 transition-colors">
-                  Pricing
+                  Get Access (Boost)
                 </a>
               </li>
               <li>
@@ -62,15 +63,15 @@ export default function Footer({ onOpenAuth }) {
                   className="hover:text-red-400 transition-colors flex items-center gap-2"
                 >
                   <Discord className="w-4 h-4 text-[#5865F2]" />
-                  <span>Official Discord</span>
+                  <span>Discord Community</span>
                 </a>
               </li>
               <li>
                 <button
-                  onClick={() => onOpenAuth(null)}
+                  onClick={() => onOpenAuth('login')}
                   className="hover:text-red-400 transition-colors text-left"
                 >
-                  Client License Login
+                  Account Login / Register
                 </button>
               </li>
               <li>
