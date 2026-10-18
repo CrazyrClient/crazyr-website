@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle, Server, Settings2 } from 'lucide-react';
-import { registerUser, loginUser, getApiBase, setApiBase } from '../services/authApi';
+import { motion } from 'framer-motion';
+import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle } from 'lucide-react';
+import { registerUser, loginUser } from '../services/authApi';
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode = 'login', initialPlan = null }) {
   const [mode, setMode] = useState('login'); // 'login' or 'register'
@@ -12,26 +12,15 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [showServerConfig, setShowServerConfig] = useState(false);
-  const [customUrl, setCustomUrl] = useState('');
 
   useEffect(() => {
     const determinedMode = (initialMode === 'register' || initialPlan === 'register') ? 'register' : 'login';
     setMode(determinedMode);
     setError('');
     setSuccess('');
-    setCustomUrl(getApiBase());
   }, [initialMode, initialPlan, isOpen]);
 
   if (!isOpen) return null;
-
-  const handleSaveCustomUrl = () => {
-    setApiBase(customUrl);
-    setShowServerConfig(false);
-    setError('');
-    setSuccess('Server URL updated!');
-    setTimeout(() => setSuccess(''), 2000);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -301,7 +290,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           </motion.button>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-white/[0.05] flex items-center justify-between text-xs text-slate-400">
+        <div className="mt-5 pt-4 border-t border-white/[0.05] flex items-center justify-center text-xs text-slate-400">
           <div>
             Need a key?{' '}
             <a
@@ -313,48 +302,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
               Boost Discord
             </a>
           </div>
-
-          <button
-            type="button"
-            onClick={() => setShowServerConfig(!showServerConfig)}
-            className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1"
-          >
-            <Settings2 className="w-3 h-3" />
-            <span>Endpoint</span>
-          </button>
         </div>
-
-        {/* Optional Collapsible Server URL config */}
-        <AnimatePresence>
-          {showServerConfig && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="mt-3 pt-3 border-t border-white/[0.05] overflow-hidden"
-            >
-              <label className="block text-[10px] font-mono text-slate-400 uppercase mb-1">
-                Backend Endpoint (e.g. Cloudflare Tunnel / SSL):
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value)}
-                  className="flex-1 px-2.5 py-1.5 rounded-lg bg-[#141722] border border-white/[0.08] text-white text-xs font-mono"
-                  placeholder="https://..."
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCustomUrl}
-                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
-                >
-                  Save
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
     </motion.div>
   );

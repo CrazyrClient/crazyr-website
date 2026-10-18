@@ -3,7 +3,12 @@ const DEFAULT_API_BASE = 'https://shaped-export-elsewhere-graduated.trycloudflar
 export function getApiBase() {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('crazyr_api_url');
-    if (custom && custom.trim()) return custom.trim();
+    if (custom && custom.trim()) {
+      if (window.location.protocol === 'https:' && custom.trim().startsWith('http:')) {
+        return DEFAULT_API_BASE;
+      }
+      return custom.trim();
+    }
   }
   return DEFAULT_API_BASE;
 }
