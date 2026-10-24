@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, User, Key, Shield, Check, Copy, ExternalLink, LogOut, Clock, Cpu, 
-  Trash2, AlertTriangle, RefreshCw, ChevronDown, ChevronUp 
+  Trash2, AlertTriangle, RefreshCw 
 } from 'lucide-react';
 import { deleteLicenseKey, redeemLicenseKey } from '../services/authApi';
 
@@ -11,12 +11,6 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
-
-  // Manual delete & redeem inputs
-  const [showCustomDelete, setShowCustomDelete] = useState(false);
-  const [manualKeyInput, setManualKeyInput] = useState('');
-  const [isManualDeleting, setIsManualDeleting] = useState(false);
-  const [manualFeedback, setManualFeedback] = useState(null);
 
   const [redeemInput, setRedeemInput] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -50,7 +44,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
   const handleConfirmDelete = async () => {
     const token = localStorage.getItem('crazyr_token');
     if (!token) {
-      setDeleteError('Nicht eingeloggt oder Sitzung abgelaufen.');
+      setDeleteError('Not signed in or session expired.');
       return;
     }
 
@@ -58,60 +52,32 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
     setDeleteError(null);
     try {
       const res = await deleteLicenseKey(token);
-      if (res.user && onUserUpdate) {
-        onUserUpdate(res.user);
+      if (onUserUpdate) {
+        onUserUpdate(res.user || {
+          ...user,
+          license_key: null,
+          tier: 'member',
+          expiry_text: null,
+          expires_at: null,
+          is_lifetime: false,
+          hwid_bound: false,
+        });
       }
       setShowDeleteConfirm(false);
     } catch (err) {
-      setDeleteError(err.message || 'Fehler beim Löschen des Lizenzschlüssels.');
+      setDeleteError(err.message || 'Failed to revoke license key.');
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // 2. Manual delete "delete <key>"
-  const handleManualDelete = async () => {
-    if (!manualKeyInput.trim()) return;
-    const token = localStorage.getItem('crazyr_token');
-    if (!token) {
-      setManualFeedback({ type: 'error', message: 'Nicht eingeloggt.' });
-      return;
-    }
-
-    // Support "delete <key>" or just "<key>"
-    let raw = manualKeyInput.trim();
-    if (raw.toLowerCase().startsWith('delete ')) {
-      raw = raw.substring(7).trim();
-    }
-
-    if (!raw) {
-      setManualFeedback({ type: 'error', message: 'Bitte einen Schlüssel angeben.' });
-      return;
-    }
-
-    setIsManualDeleting(true);
-    setManualFeedback(null);
-    try {
-      const res = await deleteLicenseKey(token, raw);
-      setManualFeedback({ type: 'success', message: res.message || `Key ${raw} gelöscht!` });
-      setManualKeyInput('');
-      if (res.user && onUserUpdate) {
-        onUserUpdate(res.user);
-      }
-    } catch (err) {
-      setManualFeedback({ type: 'error', message: err.message || 'Löschen fehlgeschlagen.' });
-    } finally {
-      setIsManualDeleting(false);
-    }
-  };
-
-  // 3. Redeem / Activate a key
+  // 2. Redeem / Activate a key
   const handleRedeem = async (e) => {
     e.preventDefault();
     if (!redeemInput.trim()) return;
     const token = localStorage.getItem('crazyr_token');
     if (!token) {
-      setRedeemFeedback({ type: 'error', message: 'Nicht eingeloggt.' });
+      setRedeemFeedback({ type: 'error', message: 'Not signed in.' });
       return;
     }
 
@@ -119,25 +85,26 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
     setRedeemFeedback(null);
     try {
       const res = await redeemLicenseKey(redeemInput.trim(), token);
-      setRedeemFeedback({ type: 'success', message: res.message || 'Erfolgreich aktiviert!' });
+      setRedeemFeedback({ type: 'success', message: res.message || 'License successfully activated!' });
       setRedeemInput('');
       const updated = {
         ...user,
         license_key: res.license_key || redeemInput.trim(),
         tier: res.tier || 'booster_1m',
-        expiry_text: res.expiry_text || '30 Tage',
-        expires_at: res.expires_at || 0,
+        expiry_text: res.expiry_text || 'Active • 30 Days',
+        expires_at: res.expires_at || (Date.now() + 30 * 24 * 60 * 60 * 1000),
         is_lifetime: res.is_lifetime || false
       };
       if (onUserUpdate) onUserUpdate(updated);
     } catch (err) {
-      setRedeemFeedback({ type: 'error', message: err.message || 'Aktivierung fehlgeschlagen.' });
+      setRedeemFeedback({ type: 'error', message: err.message || 'Activation failed. Please check your key.' });
     } finally {
       setIsRedeeming(false);
     }
   };
 
-  const tierInfo = getTierDisplay(user.tier);
+  const hasLicense = Boolean(user.license_key && user.license_key.trim());
+  const tierInfo = getTierDisplay(hasLicense ? user.tier : 'member');
 
   return (
     <motion.div
@@ -192,7 +159,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
               <span>Crazyr License Key</span>
             </label>
 
-            {user.license_key ? (
+            {hasLicense ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-[#141722] border border-white/[0.08]">
                   <code className="text-xs font-mono text-emerald-400 flex-1 truncate select-all">
@@ -227,10 +194,10 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                     onClick={() => setShowDeleteConfirm(!showDeleteConfirm)}
                     disabled={isDeleting}
                     className="px-2.5 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-red-500/20"
-                    title="Delete Key"
+                    title="Revoke Key"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <span>Revoke</span>
                   </motion.button>
                 </div>
 
@@ -246,11 +213,11 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                         <p className="font-semibold text-white">
-                          Lizenzschlüssel wirklich löschen?
+                          Revoke License Key?
                         </p>
                       </div>
                       <p className="text-[11px] text-red-300/80 leading-relaxed">
-                        Dein Booster-Rang wird entfernt und auf 'Member' zurückgesetzt. Der Schlüssel wird permanent aus der Datenbank gelöscht.
+                        Your booster rank will be revoked and reset to Member. The license key will be permanently removed.
                       </p>
                       {deleteError && (
                         <p className="text-[11px] text-red-400 font-mono">{deleteError}</p>
@@ -263,7 +230,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                           className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 disabled:opacity-50"
                         >
                           {isDeleting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                          <span>Ja, Key löschen</span>
+                          <span>Yes, Revoke Key</span>
                         </button>
                         <button
                           type="button"
@@ -271,7 +238,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                           disabled={isDeleting}
                           className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-medium text-xs transition-colors"
                         >
-                          Abbrechen
+                          Cancel
                         </button>
                       </div>
                     </motion.div>
@@ -280,13 +247,13 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
               </div>
             ) : (
               <div className="p-3.5 rounded-xl bg-[#141722] border border-dashed border-white/[0.1] text-xs text-slate-400 space-y-3">
-                <p>Noch kein Lizenzschlüssel verknüpft.</p>
+                <p>No active license key linked to this account.</p>
                 <form onSubmit={handleRedeem} className="flex gap-2">
                   <input
                     type="text"
                     value={redeemInput}
                     onChange={(e) => setRedeemInput(e.target.value)}
-                    placeholder="32-stelligen Key eingeben..."
+                    placeholder="Enter license key (e.g. CRZ-XXXX)..."
                     className="flex-1 bg-[#0E1017] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
                   />
                   <button
@@ -295,7 +262,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                     className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 disabled:opacity-50"
                   >
                     {isRedeeming ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Key className="w-3 h-3" />}
-                    <span>Aktivieren</span>
+                    <span>Activate</span>
                   </button>
                 </form>
                 {redeemFeedback && (
@@ -317,56 +284,6 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
             )}
           </div>
 
-          {/* Manual delete <key> tool */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => setShowCustomDelete(!showCustomDelete)}
-              className="text-[11px] font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1.5 transition-colors"
-            >
-              {showCustomDelete ? <ChevronUp className="w-3.5 h-3.5 text-red-500" /> : <ChevronDown className="w-3.5 h-3.5 text-red-500" />}
-              <span>Schlüssel-Befehl ausführen (delete &lt;key&gt;)</span>
-            </button>
-
-            <AnimatePresence>
-              {showCustomDelete && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-2 p-3 rounded-xl bg-[#141722] border border-white/[0.06] space-y-2 overflow-hidden"
-                >
-                  <p className="text-[11px] text-slate-400">
-                    Befehl eingeben (z. B. <code className="text-red-400 font-mono">delete ABC...</code> oder direkt den Key):
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={manualKeyInput}
-                      onChange={(e) => setManualKeyInput(e.target.value)}
-                      placeholder="delete <key>..."
-                      className="flex-1 bg-[#0E1017] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleManualDelete}
-                      disabled={isManualDeleting || !manualKeyInput.trim()}
-                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs transition-colors flex items-center gap-1 disabled:opacity-50"
-                    >
-                      {isManualDeleting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                      <span>Löschen</span>
-                    </button>
-                  </div>
-                  {manualFeedback && (
-                    <p className={`text-[11px] ${manualFeedback.type === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
-                      {manualFeedback.message}
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
           {/* Status Details Grid */}
           <div className="grid grid-cols-2 gap-3 pt-2">
             <div className="p-3 rounded-xl bg-[#141722] border border-white/[0.06]">
@@ -375,7 +292,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                 <span>Validity</span>
               </div>
               <div className="text-xs font-semibold text-white">
-                {user.is_lifetime ? 'Lifetime VIP' : (user.expiry_text || 'Active')}
+                {hasLicense ? (user.is_lifetime ? 'Lifetime VIP' : (user.expiry_text || 'Active')) : 'No Active License'}
               </div>
             </div>
 
@@ -384,8 +301,8 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
                 <Cpu className="w-3.5 h-3.5 text-slate-400" />
                 <span>Hardware ID</span>
               </div>
-              <div className="text-xs font-semibold text-emerald-400">
-                {user.hwid_bound ? 'Locked to Device' : 'Unbound (Ready)'}
+              <div className={`text-xs font-semibold ${hasLicense ? (user.hwid_bound ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-500'}`}>
+                {hasLicense ? (user.hwid_bound ? 'Locked to Device' : 'Unbound (Ready)') : 'Unlinked'}
               </div>
             </div>
           </div>
@@ -393,7 +310,7 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
 
         {/* Instructions */}
         <p className="text-[11px] text-slate-400 mb-6 leading-relaxed bg-[#141722]/60 p-3 rounded-xl border border-white/[0.04]">
-          💡 Starte den Crazyr Client und gib deinen Lizenzschlüssel ein, um deinen PC mit der Hardware-ID (HWID) zu verbinden.
+          💡 Launch the Crazyr Client and enter your license key to bind your hardware fingerprint (HWID).
         </p>
 
         {/* Actions */}
@@ -406,14 +323,14 @@ export default function UserModal({ isOpen, onClose, user, onLogout, onUserUpdat
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span>Abmelden</span>
+            <span>Sign Out</span>
           </button>
 
           <button
             onClick={onClose}
             className="px-4 py-2 text-xs font-semibold text-white bg-[#1A1D2A] hover:bg-[#232738] rounded-xl transition-colors"
           >
-            Schließen
+            Close
           </button>
         </div>
       </motion.div>

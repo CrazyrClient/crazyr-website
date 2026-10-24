@@ -73,12 +73,6 @@ export async function checkApiHealth(timeoutMs = 2500) {
 // CLIENT SECURE VAULT (Resilient Local Fallback Engine)
 // =========================================================================
 
-function generateLicenseKey() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const segment = () => Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `CRZ-${segment()}-${segment()}-${segment()}-${segment()}`;
-}
-
 function generateSessionToken(username) {
   const randPart = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
   return `crz_jwt_${btoa(username || 'user')}.${randPart}`;
@@ -161,17 +155,17 @@ export async function registerUser({ username, email, password, license_key }) {
     throw new Error('Username or Email is already registered.');
   }
 
-  const assignedKey = cleanKey || generateLicenseKey();
+  const assignedKey = cleanKey || null;
   const newAccount = {
     id: 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
     username: cleanUser,
     email: cleanEmail,
     password_hash: btoa(cleanPass),
-    tier: cleanKey ? 'booster_1m' : 'booster_lifetime',
+    tier: cleanKey ? 'booster_1m' : 'member',
     license_key: assignedKey,
-    expiry_text: 'Active • 30 Days (Renewable)',
-    expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000,
-    is_lifetime: true,
+    expiry_text: cleanKey ? 'Active • 30 Days' : null,
+    expires_at: cleanKey ? Date.now() + 30 * 24 * 60 * 60 * 1000 : null,
+    is_lifetime: false,
     created_at: new Date().toISOString(),
   };
 
@@ -249,11 +243,11 @@ export async function loginUser({ login, password }) {
           id: matched.id,
           username: matched.username,
           email: matched.email,
-          tier: matched.tier || 'booster_lifetime',
-          license_key: matched.license_key,
-          expiry_text: matched.expiry_text || 'Active • Lifetime',
+          tier: matched.tier || 'member',
+          license_key: matched.license_key || null,
+          expiry_text: matched.expiry_text || null,
           expires_at: matched.expires_at || null,
-          is_lifetime: matched.is_lifetime ?? true,
+          is_lifetime: matched.is_lifetime ?? false,
         },
       };
     } else {
@@ -261,7 +255,7 @@ export async function loginUser({ login, password }) {
     }
   }
 
-  // If no account exists locally in fresh browser session, auto-provision client access
+  // If no account exists locally in fresh browser session, create member account without license key
   if (accounts.length === 0) {
     const isEmail = cleanLogin.includes('@');
     const uName = isEmail ? cleanLogin.split('@')[0] : cleanLogin;
@@ -272,11 +266,11 @@ export async function loginUser({ login, password }) {
       username: uName,
       email: emailVal,
       password_hash: btoa(cleanPass),
-      tier: 'booster_lifetime',
-      license_key: generateLicenseKey(),
-      expiry_text: 'Active • Lifetime',
+      tier: 'member',
+      license_key: null,
+      expiry_text: null,
       expires_at: null,
-      is_lifetime: true,
+      is_lifetime: false,
       created_at: new Date().toISOString(),
     };
 
@@ -434,6 +428,7 @@ export async function deleteLicenseKey(token) {
         u.expiry_text = null;
         u.expires_at = null;
         u.is_lifetime = false;
+        u.hwid_bound = false;
         localStorage.setItem('crazyr_user', JSON.stringify(u));
 
         const accounts = getLocalVaultAccounts();
@@ -441,9 +436,13 @@ export async function deleteLicenseKey(token) {
         if (acc) {
           acc.license_key = null;
           acc.tier = 'member';
+          acc.expiry_text = null;
+          acc.expires_at = null;
+          acc.is_lifetime = false;
+          acc.hwid_bound = false;
           saveLocalVaultAccounts(accounts);
         }
-        return { status: 'SUCCESS', message: 'License key successfully revoked.' };
+        return { status: 'SUCCESS', message: 'License key successfully revoked.', user: u };
       }
     } catch {}
   }
