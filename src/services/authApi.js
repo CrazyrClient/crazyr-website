@@ -1,22 +1,52 @@
-const DEFAULT_API_BASE = 'https://shaped-export-elsewhere-graduated.trycloudflare.com';
+/**
+ * Crazyr Client Auth API Service
+ * Robust Multi-Tier Architecture:
+ * 1. User LocalStorage Override ('crazyr_api_url')
+ * 2. Vite Dev Reverse Proxy ('') in development mode (intercepts /api and forwards seamlessly)
+ * 3. Environment Variable (VITE_API_URL)
+ * 4. Production Direct Backend (Pelican Server: http://178.254.1.159:25575)
+ */
 
+export const DEFAULT_PROD_API_BASE = 'http://178.254.1.159:25575';
+
+/**
+ * Resolve the active API base URL with full fallback ladder.
+ */
 export function getApiBase() {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('crazyr_api_url');
     if (custom && custom.trim()) {
-      if (window.location.protocol === 'https:' && custom.trim().startsWith('http:')) {
-        return DEFAULT_API_BASE;
+      const cleanCustom = custom.trim().replace(/\/+$/, '');
+      // If website is hosted on HTTPS, warn about plain HTTP mixed-content restrictions
+      if (window.location.protocol === 'https:' && cleanCustom.startsWith('http:') && !cleanCustom.includes('localhost')) {
+        console.warn('[authApi] Custom HTTP URL may be blocked by browser HTTPS mixed-content policy:', cleanCustom);
       }
-      return custom.trim();
+      return cleanCustom;
     }
   }
-  return DEFAULT_API_BASE;
+
+  // In Vite Development mode (import.meta.env.DEV), return empty string so relative
+  // requests like "/api/v1/auth/..." go directly to Vite's dev proxy without CORS.
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    if (import.meta.env.DEV) {
+      return '';
+    }
+    if (import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim()) {
+      return import.meta.env.VITE_API_URL.trim().replace(/\/+$/, '');
+    }
+  }
+
+  // In production (e.g. static hosting on HTTP, electron, or local network)
+  return DEFAULT_PROD_API_BASE;
 }
 
+/**
+ * Configure or clear custom API base in localStorage.
+ */
 export function setApiBase(url) {
   if (typeof window !== 'undefined') {
     if (url && url.trim()) {
-      localStorage.setItem('crazyr_api_url', url.trim());
+      localStorage.setItem('crazyr_api_url', url.trim().replace(/\/+$/, ''));
     } else {
       localStorage.removeItem('crazyr_api_url');
     }
@@ -24,15 +54,73 @@ export function setApiBase(url) {
 }
 
 /**
- * Handle fetch errors including Browser Mixed Content (HTTPS -> HTTP) blocks.
+ * Check connectivity and latency to the backend server.
+ */
+export async function checkApiHealth(timeoutMs = 4000) {
+  const base = getApiBase();
+  const url = `${base}/api/v1/health`;
+  const start = performance.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' },
+    });
+    clearTimeout(timer);
+    const latency = Math.round(performance.now() - start);
+
+    if (res.ok) {
+      const data = await res.json().catch(() => ({ status: 'UP' }));
+      return {
+        ok: true,
+        latency,
+        status: data.status || 'UP',
+        service: data.service || 'Veloxcity-CB',
+        version: data.version || '2.1.0',
+        url: base || '(Vite Dev Proxy: /api)',
+      };
+    } else {
+      return {
+        ok: false,
+        latency,
+        error: `HTTP ${res.status}: ${res.statusText}`,
+        url: base || '(Vite Dev Proxy: /api)',
+      };
+    }
+  } catch (err) {
+    clearTimeout(timer);
+    return {
+      ok: false,
+      latency: Math.round(performance.now() - start),
+      error: err.name === 'AbortError' ? 'Connection timed out (>4s)' : (err.message || 'Network unreachable'),
+      url: base || '(Vite Dev Proxy: /api)',
+    };
+  }
+}
+
+/**
+ * Handle fetch errors including Browser Mixed Content (HTTPS -> HTTP) and network drops.
  */
 function handleFetchError(err) {
-  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && getApiBase().startsWith('http:')) {
+  const base = getApiBase();
+
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:' && base.startsWith('http:') && !base.includes('localhost')) {
     throw new Error(
-      'Mixed-Content-Sperre: Dein Browser blockiert unverschlüsselte HTTP-Anfragen auf dieser HTTPS-Website. Bitte richte SSL/HTTPS oder einen Cloudflare-Tunnel auf dem Server ein.'
+      'Mixed-Content-Sperre: Dein Browser blockiert unverschlüsselte HTTP-Anfragen auf dieser HTTPS-Website. Bitte richte einen HTTPS-Tunnel (Cloudflare) ein oder nutze einen gesicherten Endpunkt.'
     );
   }
-  throw new Error(err?.message || 'Server nicht erreichbar oder Verbindung abgelehnt.');
+
+  const rawMsg = err?.message || '';
+  if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('aborted') || err?.name === 'TypeError') {
+    throw new Error(
+      `Auth-Server nicht erreichbar (${base || 'Vite Proxy'}). Prüfe, ob der Backend-Server (178.254.1.159:25575) oder der Tunnel online ist, oder passe die Backend-URL in den Einstellungen an.`
+    );
+  }
+
+  throw new Error(rawMsg || 'Server nicht erreichbar oder Verbindung abgelehnt.');
 }
 
 /**
