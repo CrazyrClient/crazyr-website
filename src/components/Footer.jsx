@@ -2,7 +2,7 @@ import React from 'react';
 import { Disc as Discord } from 'lucide-react';
 import logoImg from '../assets/logo.png';
 
-export default function Footer({ onOpenAuth }) {
+export default function Footer({ onOpenAuth, onOpenLegal }) {
   return (
     <footer className="border-t border-white/[0.06] bg-[#07080B] pt-16 pb-12">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -75,14 +75,22 @@ export default function Footer({ onOpenAuth }) {
                 </button>
               </li>
               <li>
-                <a href="#tos" onClick={(e) => e.preventDefault()} className="hover:text-red-400 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('tos')}
+                  className="hover:text-red-400 transition-colors text-left"
+                >
                   Terms of Service
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#privacy" onClick={(e) => e.preventDefault()} className="hover:text-red-400 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => onOpenLegal && onOpenLegal('privacy')}
+                  className="hover:text-red-400 transition-colors text-left"
+                >
                   Privacy Policy
-                </a>
+                </button>
               </li>
             </ul>
           </div>

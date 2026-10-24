@@ -7,6 +7,7 @@ import FAQ from './components/FAQ';
 import Footer from './components/Footer';
 import AuthModal from './components/AuthModal';
 import UserModal from './components/UserModal';
+import LegalModal from './components/LegalModal';
 import { fetchUserProfile } from './services/authApi';
 
 export default function App() {
@@ -14,6 +15,8 @@ export default function App() {
   const [authMode, setAuthMode] = useState('login');
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [legalModalOpen, setLegalModalOpen] = useState(false);
+  const [legalTab, setLegalTab] = useState('tos');
 
   useEffect(() => {
     // 1. Initial cached state
@@ -79,13 +82,23 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <Footer onOpenAuth={handleOpenAuth} />
+      <Footer
+        onOpenAuth={handleOpenAuth}
+        onOpenLegal={(tab) => {
+          setLegalTab(tab || 'tos');
+          setLegalModalOpen(true);
+        }}
+      />
 
       {/* Auth Modal (Sign In / Register) */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         onAuthSuccess={handleAuthSuccess}
+        onOpenLegal={(tab) => {
+          setLegalTab(tab || 'tos');
+          setLegalModalOpen(true);
+        }}
         initialMode={authMode}
       />
 
@@ -103,6 +116,13 @@ export default function App() {
             localStorage.removeItem('crazyr_user');
           }
         }}
+      />
+
+      {/* Terms of Service & Privacy Policy Modal */}
+      <LegalModal
+        isOpen={legalModalOpen}
+        onClose={() => setLegalModalOpen(false)}
+        initialTab={legalTab}
       />
     </div>
   );

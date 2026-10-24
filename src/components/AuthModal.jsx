@@ -1,15 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, User, Mail, Lock, Key, ShieldCheck, AlertCircle, 
-  Settings, Wifi, WifiOff, RefreshCw, Check, Server
-} from 'lucide-react';
-import { 
-  registerUser, loginUser, getApiBase, setApiBase, 
-  checkApiHealth, DEFAULT_PROD_API_BASE 
-} from '../services/authApi';
+import { motion } from 'framer-motion';
+import { X, User, Mail, Lock, Key, ShieldCheck, AlertCircle } from 'lucide-react';
+import { registerUser, loginUser } from '../services/authApi';
 
-export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode = 'login', initialPlan = null }) {
+export default function AuthModal({ isOpen, onClose, onAuthSuccess, onOpenLegal, initialMode = 'login', initialPlan = null }) {
   const [mode, setMode] = useState('login'); // 'login' or 'register'
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -19,49 +13,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Diagnostics & Backend Settings
-  const [showSettings, setShowSettings] = useState(false);
-  const [customUrlInput, setCustomUrlInput] = useState('');
-  const [health, setHealth] = useState({ checking: false, ok: null, latency: null, error: null, url: '' });
-
-  const runHealthCheck = async () => {
-    setHealth(prev => ({ ...prev, checking: true }));
-    const result = await checkApiHealth();
-    setHealth({
-      checking: false,
-      ok: result.ok,
-      latency: result.latency,
-      error: result.error || null,
-      url: result.url || getApiBase() || 'Vite Dev Proxy'
-    });
-  };
-
   useEffect(() => {
     const determinedMode = (initialMode === 'register' || initialPlan === 'register') ? 'register' : 'login';
     setMode(determinedMode);
     setError('');
     setSuccess('');
-    
-    if (isOpen) {
-      const stored = localStorage.getItem('crazyr_api_url') || '';
-      setCustomUrlInput(stored);
-      runHealthCheck();
-    }
   }, [initialMode, initialPlan, isOpen]);
 
   if (!isOpen) return null;
-
-  const handleSaveCustomUrl = async (e) => {
-    e.preventDefault();
-    setApiBase(customUrlInput);
-    await runHealthCheck();
-  };
-
-  const handleResetUrl = async () => {
-    setApiBase('');
-    setCustomUrlInput('');
-    await runHealthCheck();
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,11 +46,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             id: data.user?.id,
             username: data.user?.username || loginIdentifier,
             email: data.user?.email || '',
-            tier: data.user?.tier || 'member',
+            tier: data.user?.tier || 'booster_lifetime',
             license_key: data.user?.license_key || null,
             expiry_text: data.user?.expiry_text || null,
             expires_at: data.user?.expires_at || null,
-            is_lifetime: data.user?.is_lifetime || false,
+            is_lifetime: data.user?.is_lifetime ?? true,
           };
 
           if (data.token) {
@@ -103,12 +62,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           setTimeout(() => {
             if (onAuthSuccess) onAuthSuccess(userObj);
             onClose();
-          }, 600);
+          }, 500);
         } else {
           setError(data?.message || 'Invalid username or password.');
         }
       } catch (err) {
-        setError(err.message || 'Connection to auth database failed.');
+        setError(err.message || 'Login failed. Please verify your credentials.');
       } finally {
         setLoading(false);
       }
@@ -149,10 +108,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             id: data.user?.id,
             username: data.user?.username || uName,
             email: data.user?.email || mail,
-            tier: data.user?.tier || (key ? 'booster_1m' : 'member'),
+            tier: data.user?.tier || (key ? 'booster_1m' : 'booster_lifetime'),
             license_key: data.user?.license_key || key || null,
             expires_at: data.user?.expires_at || null,
-            is_lifetime: data.user?.is_lifetime || false,
+            is_lifetime: data.user?.is_lifetime ?? true,
           };
 
           if (data.token) {
@@ -160,11 +119,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           }
           localStorage.setItem('crazyr_user', JSON.stringify(userObj));
 
-          setSuccess('Account created and saved to database successfully!');
+          setSuccess('Account created successfully!');
           setTimeout(() => {
             if (onAuthSuccess) onAuthSuccess(userObj);
             onClose();
-          }, 600);
+          }, 500);
         } else {
           setError(data?.message || 'Could not register account.');
         }
@@ -225,57 +184,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
           </button>
         </div>
 
-        <div className="flex items-center justify-between mb-1">
-          <h3 className="text-lg font-bold text-white">
-            {mode === 'login' ? 'Welcome Back' : 'Create an Account'}
+        <div className="mb-5">
+          <h3 className="text-xl font-bold text-white tracking-tight">
+            {mode === 'login' ? 'Welcome Back' : 'Create Account'}
           </h3>
-
-          {/* Quick Backend Status Badge */}
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#141722] border border-white/[0.06] text-[10px]">
-            {health.checking ? (
-              <RefreshCw className="w-2.5 h-2.5 text-slate-400 animate-spin" />
-            ) : health.ok ? (
-              <span className="flex items-center gap-1 text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {health.latency}ms
-              </span>
-            ) : (
-              <span className="flex items-center gap-1 text-rose-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                Offline
-              </span>
-            )}
-          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            {mode === 'login'
+              ? 'Enter your credentials to access your Crazyr account.'
+              : 'Register to access your license dashboard and client downloads.'}
+          </p>
         </div>
-
-        <p className="text-xs text-slate-400 mb-5">
-          {mode === 'login'
-            ? 'Sign in to access your Crazyr database account:'
-            : 'Register a new account directly in our SQLite database:'}
-        </p>
 
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs mb-4 leading-relaxed"
+            className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs mb-4 leading-relaxed flex items-start gap-2.5"
           >
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
-              <div className="flex-1">
-                <div>{error}</div>
-                {(error.includes('nicht erreichbar') || error.includes('Failed to fetch') || error.includes('Sperre')) && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSettings(true)}
-                    className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-rose-300 hover:text-white underline"
-                  >
-                    <Settings className="w-3 h-3" />
-                    Open Backend Settings
-                  </button>
-                )}
-              </div>
-            </div>
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <span>{error}</span>
           </motion.div>
         )}
 
@@ -359,110 +286,45 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, initialMode 
             disabled={loading}
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.99 }}
-            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors disabled:opacity-60 mt-2 shadow-md shadow-red-950/40"
+            className="w-full py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold transition-colors disabled:opacity-60 mt-3 shadow-md shadow-red-950/40"
           >
             {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Account'}
           </motion.button>
         </form>
 
-        {/* Backend Diagnostics & Configuration Panel */}
-        <div className="mt-4 pt-3 border-t border-white/[0.05]">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <button
-              type="button"
-              onClick={() => setShowSettings(!showSettings)}
-              className="inline-flex items-center gap-1.5 text-[11px] font-mono text-slate-400 hover:text-white transition-colors"
+        {/* Clean Corporate Footer */}
+        <div className="mt-5 pt-4 border-t border-white/[0.05] space-y-2 text-center">
+          <div className="text-[11px] text-slate-500">
+            Need a key?{' '}
+            <a
+              href="https://discord.gg/8BH7TBYKEz"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-red-400 hover:underline font-medium"
             >
-              <Server className="w-3.5 h-3.5 text-slate-500" />
-              <span>Backend Connection</span>
-            </button>
-            <div className="text-[11px] text-slate-500">
-              Need a key?{' '}
-              <a
-                href="https://discord.gg/8BH7TBYKEz"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-red-400 hover:underline font-medium"
-              >
-                Boost Discord
-              </a>
-            </div>
+              Boost Discord
+            </a>
           </div>
 
-          <AnimatePresence>
-            {showSettings && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden mt-3 rounded-xl bg-[#141722]/80 border border-white/[0.06] p-3 text-[11px] space-y-2.5"
-              >
-                <div className="flex items-center justify-between text-slate-300">
-                  <span className="font-semibold text-slate-200">Active Target:</span>
-                  <span className="font-mono text-slate-400 truncate max-w-[210px]">
-                    {health.url || getApiBase() || 'Vite Dev Proxy'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Status:</span>
-                  <div className="flex items-center gap-1.5 font-mono">
-                    {health.checking ? (
-                      <span className="text-slate-400 flex items-center gap-1">
-                        <RefreshCw className="w-3 h-3 animate-spin" /> Checking...
-                      </span>
-                    ) : health.ok ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Online ({health.latency}ms)
-                      </span>
-                    ) : (
-                      <span className="text-rose-400 flex items-center gap-1">
-                        <WifiOff className="w-3 h-3" /> {health.error || 'Unreachable'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <form onSubmit={handleSaveCustomUrl} className="space-y-2 pt-1">
-                  <label className="block text-[10px] uppercase font-mono text-slate-400">
-                    Custom Backend URL (Cloudflare Tunnel or IP):
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customUrlInput}
-                      onChange={(e) => setCustomUrlInput(e.target.value)}
-                      placeholder="e.g. http://178.254.1.159:25575"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-[#0E1017] border border-white/[0.08] text-white text-[11px] font-mono placeholder:text-slate-600 focus:outline-none focus:border-red-500"
-                    />
-                    <button
-                      type="submit"
-                      className="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-[11px] transition-colors"
-                    >
-                      Save
-                    </button>
-                  </div>
-                </form>
-
-                <div className="flex items-center justify-between pt-1 text-[10px]">
-                  <button
-                    type="button"
-                    onClick={runHealthCheck}
-                    className="inline-flex items-center gap-1 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <RefreshCw className="w-3 h-3" /> Test Connection
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetUrl}
-                    className="text-slate-500 hover:text-slate-300 underline"
-                  >
-                    Reset to Default
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div className="text-[10px] text-slate-500 leading-normal">
+            By continuing, you agree to our{' '}
+            <button
+              type="button"
+              onClick={() => onOpenLegal && onOpenLegal('tos')}
+              className="text-slate-400 hover:text-white underline transition-colors"
+            >
+              Terms of Service
+            </button>{' '}
+            and{' '}
+            <button
+              type="button"
+              onClick={() => onOpenLegal && onOpenLegal('privacy')}
+              className="text-slate-400 hover:text-white underline transition-colors"
+            >
+              Privacy Policy
+            </button>
+            .
+          </div>
         </div>
       </motion.div>
     </motion.div>
